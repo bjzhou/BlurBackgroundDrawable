@@ -1,7 +1,5 @@
 # BlurBackgroundDrawable
 
----
-
 
 实时动态模糊效果的实现
 
