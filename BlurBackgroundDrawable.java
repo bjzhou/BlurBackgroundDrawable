@@ -1,3 +1,4 @@
+
 package com.android.systemui.statusbar.phone;
 
 import android.annotation.SuppressLint;
@@ -7,7 +8,6 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.Matrix;
-import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.drawable.Animatable;
 import android.graphics.drawable.Drawable;
@@ -27,14 +27,13 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 @SuppressLint("NewApi")
-public class BlurBackgroundDrawable extends Drawable implements Animatable, Runnable{
+public class BlurBackgroundDrawable extends Drawable implements Animatable, Runnable {
 
     public static final long DURATION = 40;
     private boolean mRunning = false;
     private Context mContext;
     private Rect mDstRect = new Rect();
     private Display mDisplay;
-    private Paint mPaint = new Paint();
 
     private static RenderScript rs;
     private static Bitmap mScreenshot;
@@ -74,19 +73,18 @@ public class BlurBackgroundDrawable extends Drawable implements Animatable, Runn
     @Override
     public void draw(Canvas canvas) {
         if (mScreenshot != null) {
-            Gravity.apply(Gravity.FILL, mScreenshot.getWidth(), mScreenshot.getHeight(), getBounds(), mDstRect);
-            canvas.drawBitmap(mScreenshot, null, mDstRect, mPaint );
+            Gravity.apply(Gravity.FILL, mScreenshot.getWidth(), mScreenshot.getHeight(),
+                    getBounds(), mDstRect);
+            canvas.drawBitmap(mScreenshot, null, mDstRect, null);
         }
     }
 
     @Override
     public void setAlpha(int alpha) {
-        mPaint.setAlpha(alpha);
     }
 
     @Override
     public void setColorFilter(ColorFilter cf) {
-        mPaint.setColorFilter(cf);
     }
 
     @Override
@@ -98,14 +96,20 @@ public class BlurBackgroundDrawable extends Drawable implements Animatable, Runn
     public void run() {
         new MyAsyncTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
-    
+
     class MyAsyncTask extends AsyncTask<Void, Void, Void> {
         long duration;
 
         @Override
         protected Void doInBackground(Void... params) {
             duration = System.currentTimeMillis();
-            Bitmap sceenshot = Bitmap.createBitmap(getScreenshot(mContext), 0, mDisplay.getRotation() == Surface.ROTATION_270 ? getNavigationBarHegiht(mContext) / 3 : 0, SCREEN_WIDTH / 3, SCREEN_HEIGHT / 3 - getNavigationBarHegiht(mContext) / 3);;
+            Bitmap sceenshot = Bitmap
+                    .createBitmap(
+                            getScreenshot(mContext),
+                            0,
+                            mDisplay.getRotation() == Surface.ROTATION_270 ? getNavigationBarHegiht(mContext) / 6
+                                    : 0, SCREEN_WIDTH / 6, SCREEN_HEIGHT / 6
+                                    - getNavigationBarHegiht(mContext) / 6);
             sceenshot = fastblur(mContext, sceenshot);
             int rotate = 0;
             switch (mDisplay.getRotation()) {
@@ -122,7 +126,8 @@ public class BlurBackgroundDrawable extends Drawable implements Animatable, Runn
             if (rotate != 0) {
                 Matrix m = new Matrix();
                 m.postRotate(rotate);
-                sceenshot = Bitmap.createBitmap(sceenshot,0,0,sceenshot.getWidth(),sceenshot.getHeight(),m,true);
+                sceenshot = Bitmap.createBitmap(sceenshot, 0, 0, sceenshot.getWidth(),
+                        sceenshot.getHeight(), m, true);
             }
             mScreenshot = sceenshot;
             return null;
@@ -134,23 +139,25 @@ public class BlurBackgroundDrawable extends Drawable implements Animatable, Runn
             Log.d("bjzhou", "duration: " + duration + "ms");
             duration = 41 - duration;
             if (mRunning) {
-                scheduleSelf(BlurBackgroundDrawable.this, SystemClock.uptimeMillis() + duration >= 0 ? duration : 0);
+                scheduleSelf(BlurBackgroundDrawable.this,
+                        SystemClock.uptimeMillis() + duration >= 0 ? duration : 0);
                 invalidateSelf();
             }
-        }}
-    
-    private static Bitmap getScreenshot(Context context) {
+        }
+    }
 
+    private static Bitmap getScreenshot(Context context) {
 
         Bitmap shotBitmap = null;
         try {
             final Class<?> SurfaceControl = Class.forName("android.view.SurfaceControl");
             if (SurfaceControl != null) {
-                final Method screenshot = SurfaceControl.getDeclaredMethod("screenshot", int.class, int.class, int.class, int.class);
-                shotBitmap = (Bitmap) screenshot.invoke(null, 
-                        SCREEN_WIDTH / 3, 
-                        SCREEN_HEIGHT / 3, 
-                        20000, 
+                final Method screenshot = SurfaceControl.getDeclaredMethod("screenshot", int.class,
+                        int.class, int.class, int.class);
+                shotBitmap = (Bitmap) screenshot.invoke(null,
+                        SCREEN_WIDTH / 6,
+                        SCREEN_HEIGHT / 6,
+                        20000,
                         140000);
             }
         } catch (ClassNotFoundException e) {
@@ -164,10 +171,10 @@ public class BlurBackgroundDrawable extends Drawable implements Animatable, Runn
         } catch (InvocationTargetException e) {
             e.printStackTrace();
         }
-        
+
         return shotBitmap;
     }
-    
+
     private int getNavigationBarHegiht(Context context) {
         Resources resources = context.getResources();
         int resourceId = resources.getIdentifier("navigation_bar_height", "dimen", "android");
@@ -176,18 +183,18 @@ public class BlurBackgroundDrawable extends Drawable implements Animatable, Runn
         }
         return 0;
     }
-    
+
     @SuppressLint("NewApi")
     public static Bitmap fastblur(Context context, Bitmap bitmapOriginal) {
-          Bitmap outBitmap = bitmapOriginal.copy(bitmapOriginal.getConfig(), true);
-          final Allocation input = Allocation.createFromBitmap(rs, bitmapOriginal); 
-          final Allocation output = Allocation.createTyped(rs, input.getType());
-          final ScriptIntrinsicBlur script = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
-          script.setRadius(12f);
-          script.setInput(input);
-          script.forEach(output);
-          output.copyTo(outBitmap);
-          return outBitmap;
-      }
+        Bitmap outBitmap = bitmapOriginal.copy(bitmapOriginal.getConfig(), true);
+        final Allocation input = Allocation.createFromBitmap(rs, bitmapOriginal);
+        final Allocation output = Allocation.createFromBitmap(rs, outBitmap);
+        final ScriptIntrinsicBlur script = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+        script.setRadius(12f);
+        script.setInput(input);
+        script.forEach(output);
+        output.copyTo(outBitmap);
+        return outBitmap;
+    }
 
 }
